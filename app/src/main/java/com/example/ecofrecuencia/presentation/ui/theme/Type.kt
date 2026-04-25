@@ -1,4 +1,4 @@
-package com.example.ecofrecuencia.ui.theme
+package com.example.ecofrecuencia.presentation.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

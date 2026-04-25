@@ -5,6 +5,9 @@ import com.example.ecofrecuencia.domain.model.Bird
 
 sealed interface BirdUiState {
     data object Loading : BirdUiState
-    data class Success(val birds: List<Bird>) : BirdUiState
+    data class Success(
+        val birds: List<Bird>,
+        val playingBirdId: String? = null
+    ) : BirdUiState
     data class Error(val message: String) : BirdUiState
 }

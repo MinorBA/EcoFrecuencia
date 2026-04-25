@@ -30,8 +30,13 @@ class AudioPlayerHelper(private val context: Context) {
         }
     }
 
-    fun release() {
+    fun stopAudio() {
+        mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
+    }
+
+    fun release() {
+        stopAudio()
     }
 }

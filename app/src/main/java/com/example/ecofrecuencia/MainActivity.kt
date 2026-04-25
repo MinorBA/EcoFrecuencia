@@ -14,8 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.ecofrecuencia.presentation.ui.BirdScreen
-import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModelFactory
-import com.example.ecofrecuencia.ui.theme.EcoFrecuenciaTheme
+import com.example.ecofrecuencia.presentation.ui.theme.EcoFrecuenciaTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -67,7 +66,7 @@ class MainActivity : ComponentActivity() {
         val appContainer = (context.applicationContext as EcoApplication).appContainer
 
         if (permissionsGranted) {
-            val factory = remember { BirdViewModelFactory(appContainer.getNearbyBirdsUseCase) }
+            val factory = appContainer.birdViewModelFactory
             val viewModel: com.example.ecofrecuencia.presentation.viewmodel.BirdViewModel = 
                 androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
 

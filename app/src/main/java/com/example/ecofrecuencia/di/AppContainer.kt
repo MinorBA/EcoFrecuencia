@@ -3,7 +3,8 @@ package com.example.ecofrecuencia.di
 import android.content.Context
 import com.example.ecofrecuencia.data.remote.FusedLocationDataSource
 import com.example.ecofrecuencia.data.remote.HttpUrlConnectionDataSource
-import com.example.ecofrecuencia.data.remote.LocationDataSource
+import com.example.ecofrecuencia.domain.datasource.LocationDataSource
+import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModelFactory
 import com.example.ecofrecuencia.data.remote.NetworkDataSource
 import com.example.ecofrecuencia.data.repository.BirdRepositoryImpl
 import com.example.ecofrecuencia.domain.repository.BirdRepository
@@ -22,7 +23,9 @@ import java.util.concurrent.TimeUnit
  * Container manual para inyección de dependencias.
  * Proporciona instancias únicas (singleton) de servicios principales.
  */
-class AppContainer private constructor(private val context: Context) {
+class AppContainer private constructor(context: Context) {
+
+    private val appContext = context.applicationContext
 
     companion object {
         @Volatile
@@ -74,7 +77,7 @@ class AppContainer private constructor(private val context: Context) {
     }
 
     val locationDataSource: LocationDataSource by lazy {
-        FusedLocationDataSource(context)
+        FusedLocationDataSource(appContext)
     }
 
     // ==================== Repositories ====================
@@ -87,13 +90,13 @@ class AppContainer private constructor(private val context: Context) {
         GetNearbyBirdsUseCase(locationDataSource, birdRepository)
     }
 
-    // ==================== ViewModels ====================
-    val birdViewModel: BirdViewModel by lazy {
-        BirdViewModel(getNearbyBirdsUseCase)
+    // ==================== Factories ====================
+    val birdViewModelFactory: BirdViewModelFactory by lazy {
+        BirdViewModelFactory(getNearbyBirdsUseCase, audioPlayerHelper)
     }
 
     // ==================== Utils ====================
     val audioPlayerHelper: AudioPlayerHelper by lazy {
-        AudioPlayerHelper(context)
+        AudioPlayerHelper(appContext)
     }
 }

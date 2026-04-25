@@ -1,7 +1,7 @@
 // Archivo: domain/usecase/GetNearbyBirdsUseCase.kt
 package com.example.ecofrecuencia.domain.usecase
 
-import com.example.ecofrecuencia.data.remote.LocationDataSource
+import com.example.ecofrecuencia.domain.datasource.LocationDataSource
 import com.example.ecofrecuencia.domain.model.Bird
 import com.example.ecofrecuencia.domain.repository.BirdRepository
 
