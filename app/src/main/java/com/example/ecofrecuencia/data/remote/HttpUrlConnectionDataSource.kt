@@ -16,11 +16,11 @@ class HttpUrlConnectionDataSource(private val json: Json) : NetworkDataSource {
         return withContext(Dispatchers.IO) {
             try {
                 // La API de Xeno-Canto requiere que los parámetros de la consulta estén correctamente formateados.
-                // Usamos lat y lon (con un rango aproximado si es necesario, o tal cual)
-                // Formato: query=lat:VALUE lon:VALUE
+                // Formato v3: query=lat:VALUE+lon:VALUE&key=YOUR_KEY
                 val query = "lat:$lat lon:$lng"
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
-                val urlString = "https://xeno-canto.org/api/2/recordings?query=$encodedQuery"
+                // Se usa la versión 3 de la API y tu API Key personal
+                val urlString = "https://www.xeno-canto.org/api/3/recordings?query=$encodedQuery&key=74543e7fc762b1c7be0178d7d1a18ff51d4cbc18"
                 
                 val url = URL(urlString)
                 val connection = url.openConnection() as HttpURLConnection
