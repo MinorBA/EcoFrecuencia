@@ -12,30 +12,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ecofrecuencia.presentation.ui.BirdScreen
 import com.example.ecofrecuencia.presentation.ui.theme.EcoFrecuenciaTheme
+import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModel
 
 class MainActivity : ComponentActivity() {
 
-    // Variable reactiva para los permisos
     private var permissionsGrantedState = mutableStateOf(false)
 
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                      permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        permissionsGrantedState.value = granted
+        permissionsGrantedState.value =
+            permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                    permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
-        // Verificar permisos iniciales
         checkInitialPermissions()
-
         setContent {
             EcoFrecuenciaTheme {
                 MainScreen(permissionsGrantedState.value)
@@ -44,37 +44,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkInitialPermissions() {
-        val fineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-        val coarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-        permissionsGrantedState.value = fineLocation || coarseLocation
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        (application as EcoApplication).appContainer.audioPlayerHelper.release()
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+        permissionsGrantedState.value =
+            fine == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                    coarse == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     @Composable
     private fun MainScreen(permissionsGranted: Boolean) {
-        val context = LocalContext.current
-        val appContainer = (context.applicationContext as EcoApplication).appContainer
+        val appContainer = (LocalContext.current.applicationContext as EcoApplication).appContainer
 
         if (permissionsGranted) {
-            val factory = appContainer.birdViewModelFactory
-            val viewModel: com.example.ecofrecuencia.presentation.viewmodel.BirdViewModel = 
-                androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
-
-            LaunchedEffect(Unit) {
-                viewModel.fetchBirds()
-            }
-
-            BirdScreen(viewModel = viewModel)
+            val viewModel: BirdViewModel = viewModel(factory = appContainer.birdViewModelFactory)
+            BirdScreen(viewModel = viewModel) //  BirdScreen se encarga de llamar fetchBirds()
         } else {
             PermissionRequestScreen(
                 onRequestPermissions = {
@@ -103,12 +86,12 @@ class MainActivity : ComponentActivity() {
                 Text(
                     text = "Permisos de Ubicación Requeridos",
                     style = MaterialTheme.typography.headlineMedium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
                 Text(
                     text = "Para escuchar las aves de tu zona, necesitamos acceso a tu ubicación GPS. Esto nos permite encontrar las especies cercanas a ti.",
                     style = MaterialTheme.typography.bodyLarge,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
                 Button(onClick = onRequestPermissions) {
                     Text("Conceder Permisos")

@@ -3,21 +3,14 @@ package com.example.ecofrecuencia.di
 import android.content.Context
 import com.example.ecofrecuencia.data.remote.FusedLocationDataSource
 import com.example.ecofrecuencia.data.remote.HttpUrlConnectionDataSource
-import com.example.ecofrecuencia.domain.datasource.LocationDataSource
-import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModelFactory
 import com.example.ecofrecuencia.data.remote.NetworkDataSource
 import com.example.ecofrecuencia.data.repository.BirdRepositoryImpl
+import com.example.ecofrecuencia.domain.datasource.LocationDataSource
 import com.example.ecofrecuencia.domain.repository.BirdRepository
 import com.example.ecofrecuencia.domain.usecase.GetNearbyBirdsUseCase
-import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModel
 import com.example.ecofrecuencia.presentation.utils.AudioPlayerHelper
+import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModelFactory
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import java.util.concurrent.TimeUnit
 
 /**
  * Container manual para inyección de dependencias.
@@ -41,34 +34,9 @@ class AppContainer private constructor(context: Context) {
     // ==================== JSON Serialization ====================
     val jsonFormatter: Json by lazy {
         Json {
-            prettyPrint = true
             ignoreUnknownKeys = true
             coerceInputValues = true
         }
-    }
-
-    // ==================== HTTP Client ====================
-    val httpClient: OkHttpClient by lazy {
-        val loggingInterceptor = HttpLoggingInterceptor()
-        loggingInterceptor.level = HttpLoggingInterceptor.Level.BODY
-
-        OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .build()
-    }
-
-    // ==================== Retrofit ====================
-    fun createRetrofitInstance(baseUrl: String): Retrofit {
-        val contentType = "application/json".toMediaType()
-
-        return Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(httpClient)
-            .addConverterFactory(jsonFormatter.asConverterFactory(contentType))
-            .build()
     }
 
     // ==================== Data Sources ====================
