@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.ecofrecuencia.data.remote.FusedLocationDataSource
 import com.example.ecofrecuencia.data.remote.HttpUrlConnectionDataSource
 import com.example.ecofrecuencia.data.remote.NetworkDataSource
+import com.example.ecofrecuencia.data.remote.WikipediaImageDataSource
 import com.example.ecofrecuencia.data.repository.BirdRepositoryImpl
 import com.example.ecofrecuencia.domain.datasource.LocationDataSource
 import com.example.ecofrecuencia.domain.repository.BirdRepository
@@ -48,9 +49,14 @@ class AppContainer private constructor(context: Context) {
         FusedLocationDataSource(appContext)
     }
 
+    // ==================== Remote Data Sources ====================
+    val wikipediaImageDataSource: WikipediaImageDataSource by lazy {
+        WikipediaImageDataSource()
+    }
+
     // ==================== Repositories ====================
     val birdRepository: BirdRepository by lazy {
-        BirdRepositoryImpl(networkDataSource)
+        BirdRepositoryImpl(networkDataSource, wikipediaImageDataSource)
     }
 
     // ==================== Use Cases ====================
