@@ -3,18 +3,18 @@ package com.example.ecofrecuencia.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.ecofrecuencia.presentation.utils.AudioPlayerHelper
+import com.example.ecofrecuencia.presentation.utils.AudioPlayer
 import com.example.ecofrecuencia.domain.usecase.GetNearbyBirdsUseCase
 
 class BirdViewModelFactory(
     private val getNearbyBirdsUseCase: GetNearbyBirdsUseCase,
-    private val audioPlayerHelper: AudioPlayerHelper
+    private val audioPlayer: AudioPlayer
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(BirdViewModel::class.java)) {
-            return BirdViewModel(getNearbyBirdsUseCase, audioPlayerHelper) as T
+            return BirdViewModel(getNearbyBirdsUseCase, audioPlayer) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

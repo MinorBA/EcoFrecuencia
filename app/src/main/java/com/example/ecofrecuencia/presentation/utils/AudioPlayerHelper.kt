@@ -4,11 +4,11 @@ package com.example.ecofrecuencia.presentation.utils
 import android.content.Context
 import android.media.MediaPlayer
 
-class AudioPlayerHelper(private val context: Context) {
+class AudioPlayerHelper(private val context: Context) : AudioPlayer {
 
     private var mediaPlayer: MediaPlayer? = null
 
-    fun playAudio(url: String) {
+    override fun playAudio(url: String, onCompletion: () -> Unit) {
         // Release any existing player
         mediaPlayer?.release()
 
@@ -19,10 +19,12 @@ class AudioPlayerHelper(private val context: Context) {
                 start()
             }
             setOnCompletionListener {
+                onCompletion()
                 release()
                 mediaPlayer = null
             }
             setOnErrorListener { _, _, _ ->
+                onCompletion()
                 release()
                 mediaPlayer = null
                 true
@@ -30,13 +32,13 @@ class AudioPlayerHelper(private val context: Context) {
         }
     }
 
-    fun stopAudio() {
+    override fun stopAudio() {
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
     }
 
-    fun release() {
+    override fun release() {
         stopAudio()
     }
 }

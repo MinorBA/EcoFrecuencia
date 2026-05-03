@@ -7,10 +7,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class BirdRecordDto(
     val id: String,
-    val en: String, // Nombre en inglés
-    val loc: String, // Lugar
-    val file: String, // URL del audio
-    val gen: String = "", // Género
-    val sp: String = "" // especie
-
+    @SerialName("en") val englishName: String? = "Unknown Bird",
+    @SerialName("loc") val location: String? = "Unknown Location",
+    @SerialName("file") val audioUrl: String,
+    val gen: String = "",
+    val sp: String = ""
 )

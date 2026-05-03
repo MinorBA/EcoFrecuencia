@@ -99,11 +99,17 @@ fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
                         message = state.message,
                         onRetry = { viewModel.fetchBirds() }
                     )
-                    is BirdUiState.Success -> BirdList(
-                        birds = state.birds,
-                        playingBirdId = state.playingBirdId,
-                        onPlay = { bird -> viewModel.playBirdAudio(bird.id, bird.audioUrl) }
-                    )
+                    is BirdUiState.Success -> {
+                        if (state.birds.isEmpty()) {
+                            EmptyState(onRetry = { viewModel.fetchBirds() })
+                        } else {
+                            BirdList(
+                                birds = state.birds,
+                                playingBirdId = state.playingBirdId,
+                                onPlay = { bird -> viewModel.playBirdAudio(bird.id, bird.audioUrl) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -167,12 +173,26 @@ fun BirdItem(
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {}
 
-                if (bird.imageUrl != null) {
+                if (!bird.imageUrl.isNullOrBlank()) {
+                    val imageUrl = remember(bird.imageUrl) {
+                        val url = bird.imageUrl
+                        when {
+                            url.startsWith("//") -> "https:$url"
+                            url.startsWith("http://") -> url.replace("http://", "https://")
+                            else -> url
+                        }
+                    }
+
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(bird.imageUrl)
+                            .data(imageUrl)
                             .crossfade(true)
-                            .setHeader("User-Agent", "EcoFrecuencia/1.0")
+                            // No es necesario setear el Header aquí, el OkHttpClient global lo hace
+                            .listener(
+                                onError = { _, result ->
+                                    android.util.Log.e("CoilError", "Error cargando ${bird.name}: ${result.throwable.message} URL: $imageUrl")
+                                }
+                            )
                             .build(),
                         contentDescription = bird.name,
                         contentScale = ContentScale.Crop,
@@ -304,9 +324,9 @@ fun ShimmerItem() {
     val transition = rememberInfiniteTransition(label = "Shimmer")
     val translateAnim by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1000f,
+        targetValue = 2000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
+            animation = tween(1500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ShimmerTranslate"
@@ -324,13 +344,79 @@ fun ShimmerItem() {
         end = androidx.compose.ui.geometry.Offset(x = translateAnim, y = translateAnim)
     )
 
-    Box(
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(brush)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brush)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brush)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyState(onRetry: () -> Unit) {
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(brush)
-    )
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.MusicNote,
+            contentDescription = null,
+            modifier = Modifier
+                .size(100.dp)
+                .alpha(0.3f),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "No se encontraron aves",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "Prueba en otra ubicación o intenta de nuevo.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.alpha(0.7f)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onRetry) {
+            Icon(Icons.Default.Refresh, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Buscar de nuevo")
+        }
+    }
 }
 
 @Composable

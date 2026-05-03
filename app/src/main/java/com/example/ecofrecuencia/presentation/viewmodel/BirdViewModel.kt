@@ -4,7 +4,7 @@ package com.example.ecofrecuencia.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ecofrecuencia.domain.usecase.GetNearbyBirdsUseCase
-import com.example.ecofrecuencia.presentation.utils.AudioPlayerHelper
+import com.example.ecofrecuencia.presentation.utils.AudioPlayer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 class BirdViewModel(
     private val getNearbyBirdsUseCase: GetNearbyBirdsUseCase,
-    private val audioPlayerHelper: AudioPlayerHelper
+    private val audioPlayer: AudioPlayer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<BirdUiState>(BirdUiState.Loading)
@@ -38,26 +38,28 @@ class BirdViewModel(
             if (currentState.playingBirdId == birdId) {
                 stopAudio()
             } else {
-                audioPlayerHelper.playAudio(url)
-                _uiState.update { 
-                    (it as BirdUiState.Success).copy(playingBirdId = birdId) 
+                audioPlayer.playAudio(url) {
+                    // Al completar el audio, reseteamos el estado de reproducción
+                    _uiState.update { state ->
+                        (state as? BirdUiState.Success)?.copy(playingBirdId = null) ?: state
+                    }
+                }
+                _uiState.update { state ->
+                    (state as? BirdUiState.Success)?.copy(playingBirdId = birdId) ?: state
                 }
             }
         }
     }
 
     fun stopAudio() {
-        val currentState = _uiState.value
-        if (currentState is BirdUiState.Success) {
-            audioPlayerHelper.stopAudio()
-            _uiState.update { 
-                (it as BirdUiState.Success).copy(playingBirdId = null)
-            }
+        audioPlayer.stopAudio()
+        _uiState.update { state ->
+            (state as? BirdUiState.Success)?.copy(playingBirdId = null) ?: state
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        audioPlayerHelper.release()
+        audioPlayer.release()
     }
 }
