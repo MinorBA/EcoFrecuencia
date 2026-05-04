@@ -7,7 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -44,7 +46,8 @@ fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     
-    // Estado para el Pop-up de imagen
+    // Estado persistente del scroll y pop-up para evitar reinicios
+    val listState = rememberLazyListState()
     var selectedBirdForImage by remember { mutableStateOf<Bird?>(null) }
 
     LaunchedEffect(Unit) {
@@ -91,14 +94,22 @@ fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            AnimatedContent(targetState = uiState, label = "MainContent") { state ->
-                when (state) {
+            // Usamos la CLASE del estado como llave para que la animación solo ocurra
+            // al cambiar entre Loading, Success o Error, pero NO al cambiar de canción.
+            // Esto soluciona el problema de que la lista vuelva al inicio.
+            AnimatedContent(
+                targetState = uiState::class,
+                label = "MainContentTransition"
+            ) { _ ->
+                val currentState = uiState
+                when (currentState) {
                     is BirdUiState.Loading -> LoadingShimmerList()
-                    is BirdUiState.Error -> ErrorScreen(state.message) { viewModel.fetchBirds() }
+                    is BirdUiState.Error -> ErrorScreen(currentState.message) { viewModel.fetchBirds() }
                     is BirdUiState.Success -> {
                         BirdList(
-                            birds = state.birds,
-                            playingBirdId = state.playingBirdId,
+                            birds = currentState.birds,
+                            playingBirdId = currentState.playingBirdId,
+                            listState = listState,
                             onPlay = { bird -> viewModel.playBirdAudio(bird.id, bird.audioUrl) },
                             onImageClick = { bird -> selectedBirdForImage = bird }
                         )
@@ -118,10 +129,12 @@ fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
 fun BirdList(
     birds: List<Bird>,
     playingBirdId: String?,
+    listState: LazyListState,
     onPlay: (Bird) -> Unit,
     onImageClick: (Bird) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -156,7 +169,7 @@ fun BirdItem(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = animatedBgColor),
-        onClick = onPlay // El resto de la card reproduce
+        onClick = onPlay 
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -168,7 +181,7 @@ fun BirdItem(
                     .size(85.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { onImageClick() }, // Tocar imagen abre pop-up
+                    .clickable { onImageClick() },
                 contentAlignment = Alignment.Center
             ) {
                 if (!bird.imageUrl.isNullOrBlank()) {
@@ -230,58 +243,49 @@ fun ModernBottomPlayer(
             .navigationBarsPadding(),
         tonalElevation = 12.dp,
         shadowElevation = 8.dp,
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
+        color = Color(0xFF212121), // Fondo oscuro para el reproductor
         shape = RoundedCornerShape(28.dp)
     ) {
-        Column {
-            // Indicador de "progreso" estético para modernidad
-            LinearProgressIndicator(
-                progress = { 0.3f },
-                modifier = Modifier.fillMaxWidth().height(2.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = Color.Transparent
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Miniatura en el reproductor
+            AsyncImage(
+                model = bird.imageUrl?.replace("http://", "https://"),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
             )
             
-            Row(
-                modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Miniatura en el reproductor
-                AsyncImage(
-                    model = bird.imageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "REPRODUCIENDO",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFADB5FF),
+                    fontWeight = FontWeight.Bold
                 )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "REPRODUCIENDO",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = bird.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                
-                IconButton(
-                    onClick = onStop,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(24.dp))
-                }
+                Text(
+                    text = bird.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            IconButton(
+                onClick = onStop,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = Color(0xFFB3261E), // Botón rojo
+                    contentColor = Color.White
+                ),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(Icons.Rounded.Close, null, modifier = Modifier.size(24.dp))
             }
         }
     }
