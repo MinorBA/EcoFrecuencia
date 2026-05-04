@@ -14,7 +14,8 @@ class HttpUrlConnectionDataSource(private val json: Json) : NetworkDataSource {
         return withContext(Dispatchers.IO) {
             var connection: HttpURLConnection? = null
             try {
-                val query = "lat:$lat lon:$lng"
+                // Filtramos por coordenadas y aseguramos que el grupo sea estrictamente aves (birds)
+                val query = "lat:$lat lon:$lng grp:birds"
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
                 val urlString = "https://www.xeno-canto.org/api/3/recordings?query=$encodedQuery&key=74543e7fc762b1c7be0178d7d1a18ff51d4cbc18"
                 

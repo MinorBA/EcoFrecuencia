@@ -4,16 +4,15 @@ package com.example.ecofrecuencia.presentation.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,58 +20,64 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.ecofrecuencia.domain.model.Bird
 import com.example.ecofrecuencia.presentation.viewmodel.BirdUiState
 import com.example.ecofrecuencia.presentation.viewmodel.BirdViewModel
-import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.layout.ContentScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    
+    // Estado para el Pop-up de imagen
+    var selectedBirdForImage by remember { mutableStateOf<Bird?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchBirds()
     }
 
     Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
                 title = {
                     Text(
                         "EcoFrecuencia",
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.headlineMedium
                     )
                 },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                )
+                scrollBehavior = scrollBehavior
             )
         },
         bottomBar = {
+            val state = uiState
             AnimatedVisibility(
-                visible = uiState is BirdUiState.Success && (uiState as BirdUiState.Success).playingBirdId != null,
+                visible = state is BirdUiState.Success && state.playingBirdId != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
-                if (uiState is BirdUiState.Success) {
-                    val state = uiState as BirdUiState.Success
+                if (state is BirdUiState.Success) {
                     val playingBird = state.birds.find { it.id == state.playingBirdId }
                     playingBird?.let { bird ->
-                        AudioPlaybackPanel(
+                        ModernBottomPlayer(
                             bird = bird,
                             onStop = { viewModel.stopAudio() }
                         )
@@ -86,33 +91,26 @@ fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            AnimatedContent(
-                targetState = uiState,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
-                },
-                label = "UI State Transition"
-            ) { state ->
+            AnimatedContent(targetState = uiState, label = "MainContent") { state ->
                 when (state) {
                     is BirdUiState.Loading -> LoadingShimmerList()
-                    is BirdUiState.Error -> ErrorScreen(
-                        message = state.message,
-                        onRetry = { viewModel.fetchBirds() }
-                    )
+                    is BirdUiState.Error -> ErrorScreen(state.message) { viewModel.fetchBirds() }
                     is BirdUiState.Success -> {
-                        if (state.birds.isEmpty()) {
-                            EmptyState(onRetry = { viewModel.fetchBirds() })
-                        } else {
-                            BirdList(
-                                birds = state.birds,
-                                playingBirdId = state.playingBirdId,
-                                onPlay = { bird -> viewModel.playBirdAudio(bird.id, bird.audioUrl) }
-                            )
-                        }
+                        BirdList(
+                            birds = state.birds,
+                            playingBirdId = state.playingBirdId,
+                            onPlay = { bird -> viewModel.playBirdAudio(bird.id, bird.audioUrl) },
+                            onImageClick = { bird -> selectedBirdForImage = bird }
+                        )
                     }
                 }
             }
         }
+    }
+
+    // Diálogo de imagen en grande (Pop-up)
+    selectedBirdForImage?.let { bird ->
+        BirdImagePopup(bird = bird, onDismiss = { selectedBirdForImage = null })
     }
 }
 
@@ -120,7 +118,8 @@ fun BirdScreen(viewModel: BirdViewModel, modifier: Modifier = Modifier) {
 fun BirdList(
     birds: List<Bird>,
     playingBirdId: String?,
-    onPlay: (Bird) -> Unit
+    onPlay: (Bird) -> Unit,
+    onImageClick: (Bird) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -131,7 +130,8 @@ fun BirdList(
             BirdItem(
                 bird = bird,
                 isPlaying = bird.id == playingBirdId,
-                onPlay = { onPlay(bird) }
+                onPlay = { onPlay(bird) },
+                onImageClick = { onImageClick(bird) }
             )
         }
     }
@@ -141,71 +141,48 @@ fun BirdList(
 fun BirdItem(
     bird: Bird,
     isPlaying: Boolean,
-    onPlay: () -> Unit
+    onPlay: () -> Unit,
+    onImageClick: () -> Unit
 ) {
-    ElevatedCard(
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (isPlaying) 
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) 
+        else 
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        label = "BgColor"
+    )
+
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = if (isPlaying)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surface
-        ),
-        onClick = onPlay
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = animatedBgColor),
+        onClick = onPlay // El resto de la card reproduce
     ) {
         Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── Miniatura ──────────────────────────────────────
+            // Imagen con click independiente para el Pop-up
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape),
+                    .size(85.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { onImageClick() }, // Tocar imagen abre pop-up
                 contentAlignment = Alignment.Center
             ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {}
-
                 if (!bird.imageUrl.isNullOrBlank()) {
-                    val imageUrl = remember(bird.imageUrl) {
-                        val url = bird.imageUrl
-                        when {
-                            url.startsWith("//") -> "https:$url"
-                            url.startsWith("http://") -> url.replace("http://", "https://")
-                            else -> url
-                        }
-                    }
-
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(imageUrl)
+                            .data(bird.imageUrl.replace("http://", "https://"))
                             .crossfade(true)
-                            // No es necesario setear el Header aquí, el OkHttpClient global lo hace
-                            .listener(
-                                onError = { _, result ->
-                                    android.util.Log.e("CoilError", "Error cargando ${bird.name}: ${result.throwable.message} URL: $imageUrl")
-                                }
-                            )
                             .build(),
                         contentDescription = bird.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                        error = rememberVectorPainter(Icons.Rounded.MusicNote),
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Rounded.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(32.dp))
                 }
             }
 
@@ -214,92 +191,151 @@ fun BirdItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = bird.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = bird.location,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.alpha(0.7f),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
             }
 
-            PlayButton(isPlaying = isPlaying, onClick = onPlay)
+            if (!isPlaying) {
+                FilledIconButton(
+                    onClick = onPlay,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, null)
+                }
+            }
         }
     }
 }
 
 @Composable
-fun PlayButton(
-    isPlaying: Boolean,
-    onClick: () -> Unit
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isPlaying) 1.2f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "PulseScale"
-    )
-
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.scale(if (isPlaying) scale else 1f)
-    ) {
-        Icon(
-            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-            contentDescription = if (isPlaying) "Stop" else "Play",
-            tint = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(32.dp)
-        )
-    }
-}
-
-@Composable
-fun AudioPlaybackPanel(
+fun ModernBottomPlayer(
     bird: Bird,
     onStop: () -> Unit
 ) {
     Surface(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        tonalElevation = 8.dp
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .navigationBarsPadding(),
+        tonalElevation = 12.dp,
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
+        shape = RoundedCornerShape(28.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Reproduciendo...",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
+        Column {
+            // Indicador de "progreso" estético para modernidad
+            LinearProgressIndicator(
+                progress = { 0.3f },
+                modifier = Modifier.fillMaxWidth().height(2.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = Color.Transparent
+            )
+            
+            Row(
+                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Miniatura en el reproductor
+                AsyncImage(
+                    model = bird.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
                 )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "REPRODUCIENDO",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = bird.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                
+                IconButton(
+                    onClick = onStop,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BirdImagePopup(bird: Bird, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.9f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(24.dp)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(bird.imageUrl?.replace("http://", "https://"))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = bird.name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp)),
+                    contentScale = ContentScale.FillWidth
+                )
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = bird.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
                 )
-            }
-            
-            Button(
-                onClick = onStop,
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp)
-            ) {
-                Icon(Icons.Rounded.Pause, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Detener")
+                Text(
+                    text = bird.location,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
+                ) {
+                    Text("Cerrar", color = Color.White)
+                }
             }
         }
     }
@@ -307,153 +343,18 @@ fun AudioPlaybackPanel(
 
 @Composable
 fun LoadingShimmerList() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         repeat(5) {
-            ShimmerItem()
-        }
-    }
-}
-
-@Composable
-fun ShimmerItem() {
-    val transition = rememberInfiniteTransition(label = "Shimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ShimmerTranslate"
-    )
-
-    val shimmerColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-    )
-
-    val brush = Brush.linearGradient(
-        colors = shimmerColors,
-        start = androidx.compose.ui.geometry.Offset.Zero,
-        end = androidx.compose.ui.geometry.Offset(x = translateAnim, y = translateAnim)
-    )
-
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(brush)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.6f)
-                        .height(20.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(brush)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.4f)
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(brush)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyState(onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.MusicNote,
-            contentDescription = null,
-            modifier = Modifier
-                .size(100.dp)
-                .alpha(0.3f),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "No se encontraron aves",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Prueba en otra ubicación o intenta de nuevo.",
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.alpha(0.7f)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onRetry) {
-            Icon(Icons.Default.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Buscar de nuevo")
+            Box(modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(20.dp)).background(Color.LightGray.copy(alpha = 0.2f)))
         }
     }
 }
 
 @Composable
 fun ErrorScreen(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Warning,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "¡Ups! Algo salió mal",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.alpha(0.7f)
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-        ExtendedFloatingActionButton(
-            onClick = onRetry,
-            icon = { Icon(Icons.Default.Refresh, contentDescription = null) },
-            text = { Text("Reintentar") },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        )
+    Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Default.Warning, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
+        Text(message, textAlign = TextAlign.Center)
+        Button(onClick = onRetry) { Text("Reintentar") }
     }
 }
