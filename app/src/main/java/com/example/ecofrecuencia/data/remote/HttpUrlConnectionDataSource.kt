@@ -1,6 +1,7 @@
 // Archivo: data/remote/HttpUrlConnectionDataSource.kt
 package com.example.ecofrecuencia.data.remote
 
+import com.example.ecofrecuencia.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -17,7 +18,7 @@ class HttpUrlConnectionDataSource(private val json: Json) : NetworkDataSource {
                 // Filtramos por coordenadas y aseguramos que el grupo sea estrictamente aves (birds)
                 val query = "lat:$lat lon:$lng grp:birds"
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
-                val urlString = "https://www.xeno-canto.org/api/3/recordings?query=$encodedQuery&key=74543e7fc762b1c7be0178d7d1a18ff51d4cbc18"
+                val urlString = "https://www.xeno-canto.org/api/3/recordings?query=$encodedQuery&key=${BuildConfig.XENO_CANTO_KEY}"
                 
                 val url = URL(urlString)
                 connection = (url.openConnection() as HttpURLConnection).apply {
