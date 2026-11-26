@@ -50,7 +50,7 @@ class WikipediaImageDataSource(private val json: Json) {
                 connectTimeout = 8000
                 readTimeout = 8000
                 // User-Agent IDENTIFICABLE Y CONSISTENTE
-                setRequestProperty("User-Agent", "EcoFrecuenciaApp/1.2 (https://github.com/MinoBA/EcoFrecuencia; contacto@ecofrecuencia.com)")
+                setRequestProperty("User-Agent", "EcoFrecuenciaApp/1.2 (https://github.com/MinorBA/EcoFrecuencia; contacto@ecofrecuencia.com)")
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Connection", "close")
             }

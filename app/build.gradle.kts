@@ -1,8 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.android)
+}
+
+// La clave de la API de Xeno-Canto se lee de local.properties (que no se sube a Git).
+val localProperties = Properties().apply {
+    val archivo = rootProject.file("local.properties")
+    if (archivo.exists()) archivo.inputStream().use { load(it) }
 }
 
 android {
@@ -11,6 +19,11 @@ android {
 
     defaultConfig {
         applicationId = "com.example.ecofrecuencia"
+        buildConfigField(
+            "String",
+            "XENO_CANTO_KEY",
+            "\"${localProperties.getProperty("XENO_CANTO_KEY", "")}\""
+        )
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -34,6 +47,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     kotlinOptions {
         jvmTarget = "11"

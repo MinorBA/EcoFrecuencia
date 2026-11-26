@@ -28,7 +28,7 @@ class EcoApplication : Application() {
                     })
                     .addInterceptor { chain ->
                         val request = chain.request().newBuilder()
-                            .header("User-Agent", "EcoFrecuenciaApp/1.2 (https://github.com/MinoBA/EcoFrecuencia; contacto@ecofrecuencia.com)")
+                            .header("User-Agent", "EcoFrecuenciaApp/1.2 (https://github.com/MinorBA/EcoFrecuencia; contacto@ecofrecuencia.com)")
                             .build()
                         chain.proceed(request)
                     }
